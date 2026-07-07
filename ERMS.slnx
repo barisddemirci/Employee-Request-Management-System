@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="ERMS.Api/ERMS.Api.csproj" />
+    <Project Path="ERMS.Application/ERMS.Application.csproj" />
+    <Project Path="ERMS.Domain/ERMS.Domain.csproj" />
+    <Project Path="ERMS.Infrastructure/ERMS.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="ERMS.Tests/ERMS.Tests.csproj" />
+  </Folder>
+</Solution>
