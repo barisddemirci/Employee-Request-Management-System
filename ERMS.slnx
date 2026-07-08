@@ -8,4 +8,5 @@
   <Folder Name="/tests/">
     <Project Path="ERMS.Tests/ERMS.Tests.csproj" />
   </Folder>
+  <Project Path="arda/arda.csproj" Id="1f3cef3f-acf7-47f9-b58c-9688a2c8e4cd" />
 </Solution>
