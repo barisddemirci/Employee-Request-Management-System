@@ -1,1 +1,1 @@
-﻿Console.WriteLine("Selam Dünya!");
+﻿Console.WriteLine("Selam Dünyas!");
