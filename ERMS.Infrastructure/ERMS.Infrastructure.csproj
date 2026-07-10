@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ERMS.Domain\ERMS.Domain.csproj" />
+    <ProjectReference Include="..\ERMS.Application\ERMS.Application.csproj" />
   </ItemGroup>
 
 </Project>
