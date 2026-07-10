@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ERMS.Domain.Entities
 {
-    public class Departments
+    public class Department
     {
         public int DepartmentId { get; set; }
         public string Name { get; set; } = string.Empty;
