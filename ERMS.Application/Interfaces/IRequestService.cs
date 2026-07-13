@@ -7,4 +7,6 @@ public interface IRequestService
     Task<RequestResponseDto> CreateAsync(CreateRequestDto dto, int currentUserId); //currentUserId tokenden alınacak
     Task<RequestResponseDto?> GetByIdAsync(int requestId, int currentUserId);
     Task<List<RequestResponseDto>> GetMyRequestsAsync(int currentUserId);
+    Task<RequestResponseDto> SubmitAsync(int requestId, int currentUserId);
+    Task<RequestResponseDto> CancelAsync(int requestId, int currentUserId);
 }
