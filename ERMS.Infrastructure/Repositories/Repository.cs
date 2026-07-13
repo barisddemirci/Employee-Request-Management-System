@@ -42,6 +42,6 @@ public class Repository<T> : IRepository<T> where T : class
 
     public async Task SaveChangesAsync()
     {
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(); //burda hata verdi bak
     }
 }
