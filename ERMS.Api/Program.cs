@@ -23,11 +23,14 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddValidatorsFromAssemblyContaining<CreateRequestValidator>();
 
 builder.Services.AddScoped<IRequestService, RequestService>();
+builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+Console.WriteLine(BCrypt.Net.BCrypt.HashPassword("P@ssw0rd!"));
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.

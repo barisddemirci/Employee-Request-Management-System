@@ -12,5 +12,5 @@ public class RequestResponseDto
     public DateTime? EndDate { get; set; }
     public decimal? Amount { get; set; }
     public DateTime CreatedAt { get; set; }
-    public string RequesterName { get; set; } = string.Empty;  // "Ahmet Yılmaz" gibi okunabilir isim
+    public string RequesterName { get; set; } = string.Empty; 
 }
