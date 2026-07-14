@@ -1,13 +1,16 @@
-﻿using ERMS.Application.DTOs;
+﻿using ERMS.Api.Extensions;
+using ERMS.Application.DTOs;
 using ERMS.Application.Interfaces;
 using ERMS.Application.Validators;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ERMS.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Manager,Admin")]
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
@@ -24,18 +27,14 @@ public class ApprovalsController : ControllerBase
     [HttpGet("pending")]
     public async Task<IActionResult> GetPending()
     {
-        var currentManagerId = 2; // GEÇİCİ — JWT gelene kadar sabit, aşağıda açıklıyorum
-
-        var result = await _approvalService.GetPendingApprovalsAsync(currentManagerId);
+        var result = await _approvalService.GetPendingApprovalsAsync(User.GetUserId());
         return Ok(result);
     }
 
     [HttpPost("{requestId}/approve")]
     public async Task<IActionResult> Approve(int requestId, [FromBody] ApprovalDecisionDto dto)
     {
-        var currentManagerId = 2; // GEÇİCİ
-
-        var result = await _approvalService.ApproveAsync(requestId, currentManagerId, dto.Comment);
+        var result = await _approvalService.ApproveAsync(requestId, User.GetUserId(), dto.Comment);
         return Ok(result);
     }
 
@@ -44,11 +43,9 @@ public class ApprovalsController : ControllerBase
     {
         var validationResult = await _rejectValidator.ValidateAsync(dto);
         if (!validationResult.IsValid)
-             throw new ValidationException(validationResult.Errors);
+            throw new ValidationException(validationResult.Errors);
 
-        var currentManagerId = 2; // GEÇİCİ
-
-        var result = await _approvalService.RejectAsync(requestId, currentManagerId, dto.Comment!);
+        var result = await _approvalService.RejectAsync(requestId, User.GetUserId(), dto.Comment!);
         return Ok(result);
     }
 }
