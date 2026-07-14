@@ -17,6 +17,14 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (FluentValidation.ValidationException ex)
+        {
+            var errors = ex.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+            await Write(context, 400, new { code = "VALIDATION_ERROR", message = "Doğrulama hatası.", errors });
+        }
         catch (NotFoundException ex)
         {
             await Write(context, 404, new { code = "NOT_FOUND", message = ex.Message });
@@ -29,11 +37,17 @@ public class ExceptionHandlingMiddleware
         {
             await Write(context, 409, new { code = "CONFLICT", message = ex.Message });
         }
+        catch (UnauthorizedException ex)
+        {
+            await Write(context, 401, new { code = "INVALID_CREDENTIALS", message = ex.Message });
+        }
         catch (Exception)
         {
             await Write(context, 500, new { code = "INTERNAL_ERROR", message = "Beklenmeyen bir hata oluştu." });
         }
+
     }
+
 
     private static async Task Write(HttpContext ctx, int status, object body)
     {
