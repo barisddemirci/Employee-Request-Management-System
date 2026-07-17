@@ -1,0 +1,12 @@
+﻿using ERMS.Domain.Enums;
+
+namespace ERMS.Application.DTOs.Requests;
+
+public class RequestFilterDto
+{
+    public RequestStatus? Status { get; set; }
+    public int? RequestTypeId { get; set; }
+    public string? Search { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+}

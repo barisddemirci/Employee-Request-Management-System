@@ -39,6 +39,10 @@ public class Repository<T> : IRepository<T> where T : class
     {
         _dbSet.Remove(entity);
     }
+    public IQueryable<T> Query()
+    {
+        return _dbSet.AsQueryable();
+    }
 
     public async Task SaveChangesAsync()
     {
