@@ -14,15 +14,18 @@ public class RequestsController : ControllerBase
 {
     private readonly IRequestService _requestService;
     private readonly IValidator<CreateRequestDto> _validator;
+    private readonly IValidator<CreateCommentDto> _commentValidator;
 
     public RequestsController(
         IRequestService requestService,
-        IValidator<CreateRequestDto> validator)
+        IValidator<CreateRequestDto> validator,
+        IValidator<CreateCommentDto> commentValidator)
     {
         _requestService = requestService;
         _validator = validator;
+        _commentValidator = commentValidator;
     }
-
+     
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateRequestDto dto)
     {
@@ -59,5 +62,13 @@ public class RequestsController : ControllerBase
     {
         var result = await _requestService.GetMyRequestsAsync(User.GetUserId(), filter);
         return Ok(result);
+    }
+    [HttpPost("{id}/comments")]
+    public async Task<IActionResult> AddComment(int id, [FromBody] CreateCommentDto dto)
+    {
+        await _commentValidator.ValidateAndThrowAsync(dto);
+
+        var result = await _requestService.AddCommentAsync(id, User.GetUserId(), dto);
+        return Created($"/api/requests/{id}/comments/{result.Id}", result);
     }
 }

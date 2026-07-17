@@ -5,6 +5,7 @@ using ERMS.Application.Interfaces;
 using ERMS.Domain.Entities;
 using ERMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ERMS.Application.Services;
 
@@ -15,19 +16,22 @@ public class RequestService : IRequestService
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<RequestHistory> _historyRepository;
     private readonly IRepository<RequestComment> _commentRepository;
+    private readonly ILogger<RequestService> _logger;
 
     public RequestService(
         IRepository<Request> requestRepository,
         IRepository<RequestType> requestTypeRepository,
         IRepository<User> userRepository,
         IRepository<RequestHistory> historyRepository,
-        IRepository<RequestComment> commentRepository)
+        IRepository<RequestComment> commentRepository,
+        ILogger<RequestService> logger)
     {
         _requestRepository = requestRepository;
         _requestTypeRepository = requestTypeRepository;
         _userRepository = userRepository;
         _historyRepository = historyRepository;
         _commentRepository = commentRepository;
+        _logger = logger;
     }
 
     public async Task<RequestResponseDto> CreateAsync(CreateRequestDto dto, int currentUserId)
@@ -37,7 +41,26 @@ public class RequestService : IRequestService
         if (type is null || !type.IsActive)
             throw new NotFoundException("Geçersiz veya pasif bir talep türü seçildi.");
 
-        
+        // 1.5) Türe özel iş kuralları (FR-18, FR-19)
+        var errors = new Dictionary<string, string[]>();
+
+        if (type.Name == "İzin")
+        {
+            if (!dto.StartDate.HasValue || !dto.EndDate.HasValue)
+                errors["startDate"] = new[] { "İzin talebinde başlangıç ve bitiş tarihi zorunludur." };
+        }
+
+        if (type.Name == "Masraf")
+        {
+            if (!dto.Amount.HasValue)
+                errors["amount"] = new[] { "Masraf talebinde tutar zorunludur." };
+        }
+
+        if (errors.Count > 0)
+            throw new FluentValidation.ValidationException(
+                errors.SelectMany(kvp => kvp.Value.Select(msg =>
+                    new FluentValidation.Results.ValidationFailure(kvp.Key, msg))));
+
         // 2) DTO'dan Domain entity'sini kuruyoruz
         var request = new Request
         {
@@ -70,11 +93,15 @@ public class RequestService : IRequestService
         await _requestRepository.AddAsync(request);
         await _requestRepository.SaveChangesAsync();
 
+
         // 5) Talebi oluşturan kullanıcının adını çek
         var requester = await _userRepository.GetByIdAsync(currentUserId);
         var requesterName = requester is null
             ? string.Empty
             : $"{requester.FirstName} {requester.LastName}";
+
+        _logger.LogInformation("Yeni talep oluşturuldu: {RequestId}, tür: {Type}, oluşturan: {UserId}",
+    request.RequestId, type.Name, currentUserId);
 
         // 6) Cevap DTO'sunu hazırlayıp dön
         return new RequestResponseDto
@@ -91,6 +118,7 @@ public class RequestService : IRequestService
             CreatedAt = request.CreatedAt,
             RequesterName = requesterName   // ← artık gerçek isim
         };
+
     }
 
     public async Task<RequestResponseDto?> GetByIdAsync(int requestId, int currentUserId)
