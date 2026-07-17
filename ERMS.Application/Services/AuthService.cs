@@ -2,6 +2,7 @@
 using ERMS.Application.Exceptions;
 using ERMS.Application.Interfaces;
 using ERMS.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 
 namespace ERMS.Application.Services;
@@ -10,11 +11,13 @@ public class AuthService : IAuthService
 {
     private readonly IRepository<User> _userRepository;
     private readonly ITokenService _tokenService;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(IRepository<User> userRepository, ITokenService tokenService)
+    public AuthService(IRepository<User> userRepository, ITokenService tokenService, ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _tokenService = tokenService;
+        _logger = logger;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
@@ -33,6 +36,8 @@ public class AuthService : IAuthService
             throw new UnauthorizedException("E-posta veya parola hatalı.");
 
         var token = _tokenService.GenerateToken(user, out var expiresAt);
+
+        _logger.LogInformation("Kullanıcı giriş yaptı: {Email} (Id: {UserId})", user.Email, user.UserId);
 
         return new LoginResponseDto
         {

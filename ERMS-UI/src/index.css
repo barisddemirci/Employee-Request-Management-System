@@ -1,0 +1,7 @@
+/* MUI CssBaseline çoğu reset'i yapıyor; burada sadece kök yüksekliği. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}

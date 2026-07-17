@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿namespace ERMS.Domain.Entities;
 
-namespace ERMS.Domain.Entities
+public class Department
 {
-    public class Department
-    {
-        public int DepartmentId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-    }
+    public int DepartmentId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
 }

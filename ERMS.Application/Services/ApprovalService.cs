@@ -4,6 +4,7 @@ using ERMS.Application.Exceptions;
 using ERMS.Application.Interfaces;
 using ERMS.Domain.Entities;
 using ERMS.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace ERMS.Application.Services;
 
@@ -14,19 +15,22 @@ public class ApprovalService : IApprovalService
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<Approval> _approvalRepository;
     private readonly IRepository<RequestHistory> _historyRepository;
+    private readonly ILogger<ApprovalService> _logger;
 
     public ApprovalService(
         IRepository<Request> requestRepository,
         IRepository<RequestType> requestTypeRepository,
         IRepository<User> userRepository,
         IRepository<Approval> approvalRepository,
-        IRepository<RequestHistory> historyRepository)
+        IRepository<RequestHistory> historyRepository,
+        ILogger<ApprovalService> logger)
     {
         _requestRepository = requestRepository;
         _requestTypeRepository = requestTypeRepository;
         _userRepository = userRepository;
         _approvalRepository = approvalRepository;
         _historyRepository = historyRepository;
+        _logger = logger;
     }
 
     public async Task<List<RequestResponseDto>> GetPendingApprovalsAsync(int managerId)
@@ -73,6 +77,8 @@ public class ApprovalService : IApprovalService
         request.UpdatedAt = DateTime.UtcNow;
         await _requestRepository.SaveChangesAsync();
 
+        _logger.LogInformation("Talep onaylandı: {RequestId}, onaylayan: {ManagerId}", requestId, managerId);
+
         await CreateApprovalRecordAsync(requestId, managerId, "Approved", comment);
         await LogHistoryAsync(requestId, managerId, oldStatus, request.Status);
 
@@ -87,6 +93,8 @@ public class ApprovalService : IApprovalService
         request.Status = RequestStatus.Rejected;
         request.UpdatedAt = DateTime.UtcNow;
         await _requestRepository.SaveChangesAsync();
+
+        _logger.LogInformation("Talep reddedildi: {RequestId}, reddeden: {ManagerId}", requestId, managerId);
 
         await CreateApprovalRecordAsync(requestId, managerId, "Rejected", comment);
         await LogHistoryAsync(requestId, managerId, oldStatus, request.Status);
