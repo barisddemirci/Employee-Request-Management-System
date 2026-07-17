@@ -1,8 +1,10 @@
-﻿using ERMS.Application.DTOs.Requests;
+﻿using ERMS.Application.DTOs;
+using ERMS.Application.DTOs.Requests;
+using ERMS.Application.Exceptions;
 using ERMS.Application.Interfaces;
 using ERMS.Domain.Entities;
 using ERMS.Domain.Enums;
-using ERMS.Application.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace ERMS.Application.Services;
 
@@ -12,17 +14,20 @@ public class RequestService : IRequestService
     private readonly IRepository<RequestType> _requestTypeRepository;
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<RequestHistory> _historyRepository;
+    private readonly IRepository<RequestComment> _commentRepository;
 
     public RequestService(
         IRepository<Request> requestRepository,
         IRepository<RequestType> requestTypeRepository,
         IRepository<User> userRepository,
-        IRepository<RequestHistory> historyRepository)
+        IRepository<RequestHistory> historyRepository,
+        IRepository<RequestComment> commentRepository)
     {
         _requestRepository = requestRepository;
         _requestTypeRepository = requestTypeRepository;
         _userRepository = userRepository;
         _historyRepository = historyRepository;
+        _commentRepository = commentRepository;
     }
 
     public async Task<RequestResponseDto> CreateAsync(CreateRequestDto dto, int currentUserId)
@@ -120,21 +125,43 @@ public class RequestService : IRequestService
         };
     }
 
-    public async Task<List<RequestResponseDto>> GetMyRequestsAsync(int currentUserId)
+    public async Task<PagedResultDto<RequestResponseDto>> GetMyRequestsAsync(int currentUserId, RequestFilterDto filter)
     {
-        var allRequests = await _requestRepository.GetAllAsync();
-        var myRequests = allRequests.Where(r => r.RequesterId == currentUserId).ToList();
+        // 1) Sorgunun tarifini kur — henüz DB'ye gitmiyor
+        var query = _requestRepository.Query()
+            .Where(r => r.RequesterId == currentUserId);
 
-        var result = new List<RequestResponseDto>();
+        // 2) Filtreleri koşullu olarak ekle (sadece dolu olanları)
+        if (filter.Status.HasValue)
+            query = query.Where(r => r.Status == filter.Status.Value);
 
-        foreach (var request in myRequests)
+        if (filter.RequestTypeId.HasValue)
+            query = query.Where(r => r.RequestTypeId == filter.RequestTypeId.Value);
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+            query = query.Where(r => r.Title.Contains(filter.Search));
+
+        // 3) Toplam sayıyı al (sayfalamadan ÖNCE, filtrelenmiş haliyle)
+        var totalCount = await query.CountAsync();
+
+        // 4) Sırala + sayfala, sonra DB'den çek
+        var pagedRequests = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync();
+
+        // 5) Her talep için DTO kur
+        var items = new List<RequestResponseDto>();
+        foreach (var request in pagedRequests)
         {
             var type = await _requestTypeRepository.GetByIdAsync(request.RequestTypeId);
             var requester = await _userRepository.GetByIdAsync(request.RequesterId);
             var requesterName = requester is null
                 ? string.Empty
                 : $"{requester.FirstName} {requester.LastName}";
-            result.Add(new RequestResponseDto
+
+            items.Add(new RequestResponseDto
             {
                 Id = request.RequestId,
                 Title = request.Title,
@@ -150,7 +177,14 @@ public class RequestService : IRequestService
             });
         }
 
-        return result;
+        // 6) Sayfalı sonucu döndür
+        return new PagedResultDto<RequestResponseDto>
+        {
+            Page = filter.Page,
+            PageSize = filter.PageSize,
+            TotalCount = totalCount,
+            Items = items
+        };
     }
     public async Task<RequestResponseDto> SubmitAsync(int requestId, int currentUserId)
     {
@@ -226,6 +260,118 @@ public class RequestService : IRequestService
             Amount = request.Amount,
             CreatedAt = request.CreatedAt,
             RequesterName = requester is null ? string.Empty : $"{requester.FirstName} {requester.LastName}"
+        };
+    }
+    public async Task<RequestDetailDto> GetDetailAsync(int requestId, int currentUserId)
+    {
+        var request = await _requestRepository.GetByIdAsync(requestId);
+        if (request is null)
+            throw new NotFoundException("Talep bulunamadı.");
+
+        // Sahiplik kontrolü (FR-26) — şimdilik sadece sahibi görebilir
+        if (request.RequesterId != currentUserId)
+            throw new ForbiddenException("Bu talebi görüntüleme yetkiniz yok.");
+
+        var type = await _requestTypeRepository.GetByIdAsync(request.RequestTypeId);
+        var requester = await _userRepository.GetByIdAsync(request.RequesterId);
+        var requesterName = requester is null
+            ? string.Empty
+            : $"{requester.FirstName} {requester.LastName}";
+
+        // --- Yorumları çek ---
+        var allComments = await _commentRepository.GetAllAsync();
+        var commentsForRequest = allComments
+            .Where(c => c.RequestId == requestId)
+            .OrderBy(c => c.CreatedAt)
+            .ToList();
+
+        var commentDtos = new List<RequestCommentDto>();
+        foreach (var comment in commentsForRequest)
+        {
+            var author = await _userRepository.GetByIdAsync(comment.AuthorId);
+            commentDtos.Add(new RequestCommentDto
+            {
+                Id = comment.RequestCommentId,
+                AuthorName = author is null ? string.Empty : $"{author.FirstName} {author.LastName}",
+                Content = comment.Content,
+                CreatedAt = comment.CreatedAt
+            });
+        }
+
+        // --- Geçmişi çek ---
+        var allHistory = await _historyRepository.GetAllAsync();
+        var historyForRequest = allHistory
+            .Where(h => h.RequestId == requestId)
+            .OrderBy(h => h.ChangedAt)
+            .ToList();
+
+        var historyDtos = new List<RequestHistoryDto>();
+        foreach (var h in historyForRequest)
+        {
+            var changedBy = await _userRepository.GetByIdAsync(h.ChangedById);
+            historyDtos.Add(new RequestHistoryDto
+            {
+                Id = h.RequestHistoryId,
+                ChangedByName = changedBy is null ? string.Empty : $"{changedBy.FirstName} {changedBy.LastName}",
+                OldStatus = h.OldStatus?.ToString(),
+                NewStatus = h.NewStatus.ToString(),
+                ChangedAt = h.ChangedAt
+            });
+        }
+
+        // --- Hepsini birleştir ---
+        return new RequestDetailDto
+        {
+            Id = request.RequestId,
+            Title = request.Title,
+            Description = request.Description,
+            Type = type?.Name ?? string.Empty,
+            Status = request.Status.ToString(),
+            Priority = request.Priority,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            Amount = request.Amount,
+            CreatedAt = request.CreatedAt,
+            RequesterName = requesterName,
+            Comments = commentDtos,
+            History = historyDtos
+        };
+    }
+    public async Task<RequestCommentDto> AddCommentAsync(int requestId, int currentUserId, CreateCommentDto dto)
+    {
+        // 1) Talep var mı?
+        var request = await _requestRepository.GetByIdAsync(requestId);
+        if (request is null)
+            throw new NotFoundException("Talep bulunamadı.");
+
+        // 2) Yorum ekleme yetkisi: talep sahibi VEYA o talebin sahibinin yöneticisi (FR-38)
+        var requester = await _userRepository.GetByIdAsync(request.RequesterId);
+        var isOwner = request.RequesterId == currentUserId;
+        var isManagerOfOwner = requester is not null && requester.ManagerId == currentUserId;
+
+        if (!isOwner && !isManagerOfOwner)
+            throw new ForbiddenException("Bu talebe yorum ekleme yetkiniz yok.");
+
+        // 3) Yorumu oluştur ve kaydet
+        var comment = new RequestComment
+        {
+            RequestId = requestId,
+            AuthorId = currentUserId,
+            Content = dto.Content,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _commentRepository.AddAsync(comment);
+        await _commentRepository.SaveChangesAsync();
+
+        // 4) Yazarın adını çekip DTO dön
+        var author = await _userRepository.GetByIdAsync(currentUserId);
+        return new RequestCommentDto
+        {
+            Id = comment.RequestCommentId,
+            AuthorName = author is null ? string.Empty : $"{author.FirstName} {author.LastName}",
+            Content = comment.Content,
+            CreatedAt = comment.CreatedAt
         };
     }
     private async Task LogHistoryAsync(int requestId, int changedById, RequestStatus oldStatus, RequestStatus newStatus)

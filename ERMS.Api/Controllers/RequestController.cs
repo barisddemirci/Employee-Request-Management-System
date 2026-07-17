@@ -36,10 +36,7 @@ public class RequestsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var result = await _requestService.GetByIdAsync(id, User.GetUserId());
-        if (result is null)
-            return NotFound();
-
+        var result = await _requestService.GetDetailAsync(id, User.GetUserId());
         return Ok(result);
     }
 
@@ -58,9 +55,9 @@ public class RequestsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetMyRequests()
+    public async Task<IActionResult> GetMyRequests([FromQuery] RequestFilterDto filter)
     {
-        var result = await _requestService.GetMyRequestsAsync(User.GetUserId());
+        var result = await _requestService.GetMyRequestsAsync(User.GetUserId(), filter);
         return Ok(result);
     }
 }
