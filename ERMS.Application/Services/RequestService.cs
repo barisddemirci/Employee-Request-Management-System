@@ -16,6 +16,7 @@ public class RequestService : IRequestService
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<RequestHistory> _historyRepository;
     private readonly IRepository<RequestComment> _commentRepository;
+    private readonly IRepository<Approval> _approvalRepository;
     private readonly ILogger<RequestService> _logger;
 
     public RequestService(
@@ -24,7 +25,8 @@ public class RequestService : IRequestService
         IRepository<User> userRepository,
         IRepository<RequestHistory> historyRepository,
         IRepository<RequestComment> commentRepository,
-        ILogger<RequestService> logger)
+        ILogger<RequestService> logger,
+        IRepository<Approval> approvalRepository)
     {
         _requestRepository = requestRepository;
         _requestTypeRepository = requestTypeRepository;
@@ -32,6 +34,7 @@ public class RequestService : IRequestService
         _historyRepository = historyRepository;
         _commentRepository = commentRepository;
         _logger = logger;
+        _approvalRepository = approvalRepository;
     }
 
     public async Task<RequestResponseDto> CreateAsync(CreateRequestDto dto, int currentUserId)
@@ -296,15 +299,25 @@ public class RequestService : IRequestService
         if (request is null)
             throw new NotFoundException("Talep bulunamadı.");
 
-        // Sahiplik kontrolü (FR-26) — şimdilik sadece sahibi görebilir
-        if (request.RequesterId != currentUserId)
+        // ▼ DEĞİŞEN KISIM BAŞLANGIÇ ▼
+        // Erişim kontrolü için gerekli verileri ÖNCEden çek
+        var requester = await _userRepository.GetByIdAsync(request.RequesterId);
+        var currentUser = await _userRepository.GetByIdAsync(currentUserId);
+
+        // Üç koşuldan biri yeterliyse erişim ver (FR-26 genişletildi)
+        var isOwner = request.RequesterId == currentUserId;
+        var isManagerOfOwner = requester is not null && requester.ManagerId == currentUserId;
+        var isAdmin = currentUser is not null && currentUser.Role == Role.Admin;
+
+        if (!isOwner && !isManagerOfOwner && !isAdmin)
             throw new ForbiddenException("Bu talebi görüntüleme yetkiniz yok.");
 
+        // requester zaten yukarıda çekildi, tekrar çekmeye gerek yok
         var type = await _requestTypeRepository.GetByIdAsync(request.RequestTypeId);
-        var requester = await _userRepository.GetByIdAsync(request.RequesterId);
         var requesterName = requester is null
             ? string.Empty
             : $"{requester.FirstName} {requester.LastName}";
+        // ▲ DEĞİŞEN KISIM BİTİŞ ▲
 
         // --- Yorumları çek ---
         var allComments = await _commentRepository.GetAllAsync();
@@ -346,7 +359,26 @@ public class RequestService : IRequestService
                 ChangedAt = h.ChangedAt
             });
         }
+        // --- Onay/Red kayıtlarını çek ---
+        var allApprovals = await _approvalRepository.GetAllAsync();
+        var approvalsForRequest = allApprovals
+            .Where(a => a.RequestId == requestId)
+            .OrderBy(a => a.DecidedAt)
+            .ToList();
 
+        var approvalDtos = new List<ApprovalDto>();
+        foreach (var a in approvalsForRequest)
+        {
+            var approver = await _userRepository.GetByIdAsync(a.ApproverId);
+            approvalDtos.Add(new ApprovalDto
+            {
+                Id = a.ApprovalId,
+                DecidedByName = approver is null ? string.Empty : $"{approver.FirstName} {approver.LastName}",
+                Decision = a.Decision,
+                Comment = a.Comment,
+                DecidedAt = a.DecidedAt
+            });
+        }
         // --- Hepsini birleştir ---
         return new RequestDetailDto
         {
@@ -362,7 +394,8 @@ public class RequestService : IRequestService
             CreatedAt = request.CreatedAt,
             RequesterName = requesterName,
             Comments = commentDtos,
-            History = historyDtos
+            History = historyDtos,
+            Approvals = approvalDtos
         };
     }
     public async Task<RequestCommentDto> AddCommentAsync(int requestId, int currentUserId, CreateCommentDto dto)

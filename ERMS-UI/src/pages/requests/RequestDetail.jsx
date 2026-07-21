@@ -15,7 +15,7 @@ import {
 } from '../../api/requests';
 import { approveRequest, rejectRequest } from '../../api/approvals';
 import { parseApiError } from '../../utils/apiError';
-import { formatDate, formatDateTime, formatAmount, statusLabel, PRIORITY_LABELS } from '../../utils/format';
+import { formatDate, formatDateTime, formatAmount, statusLabel, PRIORITY_LABELS, STATUS_COLORS } from '../../utils/format';
 import StatusChip from '../../components/StatusChip';
 import { useAuth } from '../../auth/AuthContext';
 import { ROLES } from '../../auth/roles';
@@ -237,6 +237,60 @@ export default function RequestDetail() {
                 />
               </ListItem>
             ))}
+          </List>
+        )}
+      </Paper>
+
+      {/* Onay/Red kararları */}
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Onay/Red Kararları</Typography>
+      <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+        {(!detail.approvals || detail.approvals.length === 0) ? (
+          <Typography color="text.secondary">Henüz karar verilmedi.</Typography>
+        ) : (
+          <List dense disablePadding>
+            {detail.approvals.map((a) => {
+              const rejected = a.decision === 'Rejected';
+              return (
+                <ListItem key={a.id} alignItems="flex-start" divider sx={{ px: 0 }}>
+                  <Avatar sx={{ mr: 2, bgcolor: rejected ? 'error.main' : 'success.main' }}>
+                    {rejected ? <CloseIcon fontSize="small" /> : <CheckIcon fontSize="small" />}
+                  </Avatar>
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Chip
+                          size="small"
+                          color={STATUS_COLORS[a.decision] ?? 'default'}
+                          label={statusLabel(a.decision)}
+                        />
+                        <Typography variant="subtitle2">{a.decidedByName}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDateTime(a.decidedAt)}
+                        </Typography>
+                      </Stack>
+                    }
+                    secondary={
+                      a.comment ? (
+                        <Alert
+                          severity={rejected ? 'error' : 'info'}
+                          icon={false}
+                          sx={{ mt: 1, py: 0.5, whiteSpace: 'pre-wrap' }}
+                        >
+                          <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                            {rejected ? 'Reddetme Gerekçesi' : 'Açıklama'}
+                          </Typography>
+                          {a.comment}
+                        </Alert>
+                      ) : rejected ? (
+                        <Typography variant="body2" color="error" sx={{ mt: 0.5 }}>
+                          Gerekçe belirtilmedi.
+                        </Typography>
+                      ) : null
+                    }
+                  />
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Paper>
