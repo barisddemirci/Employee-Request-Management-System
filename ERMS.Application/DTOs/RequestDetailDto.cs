@@ -16,4 +16,5 @@ public class RequestDetailDto
 
     public List<RequestCommentDto> Comments { get; set; } = new();
     public List<RequestHistoryDto> History { get; set; } = new();
+    public List<ApprovalDto> Approvals { get; set; } = new();
 }
