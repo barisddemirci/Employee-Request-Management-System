@@ -395,7 +395,7 @@ public class RequestService : IRequestService
             RequesterName = requesterName,
             Comments = commentDtos,
             History = historyDtos,
-            Approvals = approvalDtos
+            Approvals = approvalDtos,
         };
     }
     public async Task<RequestCommentDto> AddCommentAsync(int requestId, int currentUserId, CreateCommentDto dto)

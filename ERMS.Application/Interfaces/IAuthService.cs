@@ -4,5 +4,5 @@ namespace ERMS.Application.Interfaces;
 
 public interface IAuthService
 {
-    Task<LoginResponseDto> LoginAsync(LoginDto dto); //BURAYI İNCELE BURDA KALDIN AÇIKLAMAYA BAK
+    Task<LoginResponseDto> LoginAsync(LoginDto dto); //BURAYI İNCELE BURDA KALDIN 
 }
